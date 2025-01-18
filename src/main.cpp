@@ -1,43 +1,40 @@
 #include "utils.hpp"
 #include <hedgehog/hedgehog.h>
 
-template <typename Input, typename ComputeTaskType>
-using FnType = void (*)(std::shared_ptr<Input>, ComputeTaskType);
-
 /******************************************************************************/
 /*                            compute task single                             */
 /******************************************************************************/
 
-template <typename CoreTaskType, typename Input, typename... Outs>
-class ComputeTaskSingle : public hh::AbstractTask<1, Input, Outs...> {
+template <typename CoreTaskType, typename Input, typename... Outputs>
+class SingleInputTask : public hh::AbstractTask<1, Input, Outputs...> {
 public:
-  using Fn = FnType<Input, ComputeTaskSingle<CoreTaskType, Input, Outs...> *>;
+  using Fn = FnType<Input, SingleInputTask<CoreTaskType, Input, Outputs...> *>;
 
-  explicit ComputeTaskSingle(Fn                            pExecute,
-                             std::shared_ptr<CoreTaskType> coreTask)
-      : hh::AbstractTask<1, Input, Outs...>(), pExecute_(pExecute),
-        coreTask_(coreTask) {}
+  explicit SingleInputTask(Fn                            executable,
+                           std::shared_ptr<CoreTaskType> coreTask)
+      : hh::AbstractTask<1, Input, Outputs...>(coreTask),
+        executable_(executable), coreTask_(coreTask) {}
 
   void execute(std::shared_ptr<Input> data) override {
     // we can't do that because all the methods are protected and we can use
     // friend in ComputeTask:
-    //     pExecute_(data, computeTask_);
-    pExecute_(data, this);
+    //     executable_(data, computeTask_);
+    executable_(data, this);
   }
 
-  std::shared_ptr<hh::AbstractTask<1, Input, Outs...>> copy() override {
-    return std::make_shared<ComputeTaskSingle<CoreTaskType, Input, Outs...>>(
-        pExecute_, coreTask_);
+  std::shared_ptr<hh::AbstractTask<1, Input, Outputs...>> copy() override {
+    return std::make_shared<SingleInputTask<CoreTaskType, Input, Outputs...>>(
+        executable_, coreTask_);
   }
 
-  // Well...
+  // For a reason, friendship only didn't work
   friend Fn;
-  using hh::AbstractTask<1, Input, Outs...>::addResult;
-  using hh::AbstractTask<1, Input, Outs...>::getManagedMemory;
-  using hh::AbstractTask<1, Input, Outs...>::deviceId;
+  using hh::AbstractTask<1, Input, Outputs...>::addResult;
+  using hh::AbstractTask<1, Input, Outputs...>::getManagedMemory;
+  using hh::AbstractTask<1, Input, Outputs...>::deviceId;
 
 private:
-  Fn                            pExecute_;
+  Fn                            executable_;
   std::shared_ptr<CoreTaskType> coreTask_;
 };
 
@@ -45,45 +42,53 @@ private:
 /*                                compute task                                */
 /******************************************************************************/
 
-template <class Ins, class Outs> class ComputeTask;
+template <class Inputs, class Outputs> class SingleInputTaskCombinator;
 
-template <class... Ins, class... Outs>
-class ComputeTask<In<Ins...>, Out<Outs...>>
-    : public ComputeTaskSingle<hh::core::CoreTask<1, Ins, Outs...>, Ins,
-                               Outs...>... {
+template <class... Inputs, class... Outputs>
+class SingleInputTaskCombinator<In<Inputs...>, Out<Outputs...>>
+    : public SingleInputTask<hh::core::CoreTask<1, Inputs, Outputs...>, Inputs,
+                             Outputs...>... {
 private:
-  using core_t = hh::core::CoreTask<sizeof...(Ins), Ins..., Outs...>;
+  using CoreTaskType =
+      hh::core::CoreTask<sizeof...(Inputs), Inputs..., Outputs...>;
 
 public:
   // proposal for variadic friend for C++26
-  // friend FnType<Ins, ComputeTaskSingle *>...;
-  explicit ComputeTask(auto pExecute, std::shared_ptr<core_t> coreTask)
-      : ComputeTaskSingle<hh::core::CoreTask<1, Ins, Outs...>, Ins, Outs...>(
-            pExecute,
-            std::dynamic_pointer_cast<hh::core::CoreTask<1, Ins, Outs...>>(
-                coreTask))... {}
+  // friend FnType<Inputs, ComputeTaskSingle *>...;
+
+  template <typename Executable>
+  explicit SingleInputTaskCombinator(Executable                    executable,
+                                     std::shared_ptr<CoreTaskType> coreTask)
+      : SingleInputTask<hh::core::CoreTask<1, Inputs, Outputs...>, Inputs,
+                        Outputs...>(
+            executable,
+            std::dynamic_pointer_cast<
+                hh::core::CoreTask<1, Inputs, Outputs...>>(coreTask))... {}
 };
 
 /******************************************************************************/
 /*                           compute task interface                           */
 /******************************************************************************/
 
-template <typename Input, typename Output> class ComputeTaskInterface;
+template <typename Input, typename Output> class LambdaTask;
 
-template <typename... Ins, typename... Outs>
-class ComputeTaskInterface<In<Ins...>, Out<Outs...>>
-    : public ComputeTask<In<Ins...>, Out<Outs...>> {
+template <typename... Inputs, typename... Outputs>
+class LambdaTask<In<Inputs...>, Out<Outputs...>>
+    : public SingleInputTaskCombinator<In<Inputs...>, Out<Outputs...>> {
 private:
-  using core_t = hh::core::CoreTask<sizeof...(Ins), Ins..., Outs...>;
-  using abstract_task_t = hh::AbstractTask<sizeof...(Ins), Ins..., Outs...>;
+  using CoreTaskType =
+      hh::core::CoreTask<sizeof...(Inputs), Inputs..., Outputs...>;
+  using AbstractTaskType =
+      hh::AbstractTask<sizeof...(Inputs), Inputs..., Outputs...>;
 
 public:
-  ComputeTaskInterface(const std::string name, auto pExecute,
-                       int32_t numberThreads = 1, bool automaticStart = false)
-      : ComputeTask<In<Ins...>, Out<Outs...>>(
-            pExecute,
-            std::make_shared<core_t>(dynamic_cast<abstract_task_t *>(this),
-                                     name, numberThreads, automaticStart)) {}
+  template <typename Executable>
+  LambdaTask(const std::string name, Executable executable,
+             int32_t numberThreads = 1, bool automaticStart = false)
+      : SingleInputTaskCombinator<In<Inputs...>, Out<Outputs...>>(
+            executable, std::make_shared<CoreTaskType>(
+                            dynamic_cast<AbstractTaskType *>(this), name,
+                            numberThreads, automaticStart)) {}
 };
 
 /******************************************************************************/
@@ -91,23 +96,20 @@ public:
 /******************************************************************************/
 
 int main() {
-  auto Simple =
-      std::make_shared<ComputeTaskInterface<In<int, double>, Out<int>>>(
-          "Simple", []<typename T>(std::shared_ptr<T> data, auto *pThis) {
-            if constexpr (std::is_same_v<T, int>) {
-              (*data)++;
-              printf("[Simple][Data %d][Device ID %d]\n", *data,
-                     pThis->deviceId());
-              pThis->getManagedMemory();
-              pThis->addResult(data);
-            } else if constexpr (std::is_same_v<T, double>) {
-              (*data)++;
-              printf("[Simple][Data %f][Device ID %d]\n", *data,
-                     pThis->deviceId());
-              pThis->getManagedMemory();
-              pThis->addResult(std::make_shared<int>(*data));
-            }
-          });
+  auto Simple = std::make_shared<LambdaTask<In<int, double>, Out<int>>>(
+      "Simple", []<typename T>(std::shared_ptr<T> data, auto *pThis) {
+        if constexpr (std::is_same_v<T, int>) {
+          (*data)++;
+          printf("[Simple][Data %d][Device ID %d]\n", *data, pThis->deviceId());
+          pThis->getManagedMemory();
+          pThis->addResult(data);
+        } else if constexpr (std::is_same_v<T, double>) {
+          (*data)++;
+          printf("[Simple][Data %f][Device ID %d]\n", *data, pThis->deviceId());
+          pThis->getManagedMemory();
+          pThis->addResult(std::make_shared<int>(*data));
+        }
+      });
 
   auto test =
       std::dynamic_pointer_cast<hh::AbstractTask<2, int, double, int>>(Simple);
