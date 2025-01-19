@@ -45,7 +45,7 @@ private:
 template <class Inputs, class Outputs> class SingleInputTaskCombinator;
 
 template <class... Inputs, class... Outputs>
-class SingleInputTaskCombinator<In<Inputs...>, Out<Outputs...>>
+class SingleInputTaskCombinator<std::tuple<Inputs...>, std::tuple<Outputs...>>
     : public SingleInputTask<hh::core::CoreTask<1, Inputs, Outputs...>, Inputs,
                              Outputs...>... {
 private:
@@ -70,22 +70,20 @@ public:
 /*                           compute task interface                           */
 /******************************************************************************/
 
-template <typename Input, typename Output> class LambdaTask;
-
-template <typename... Inputs, typename... Outputs>
-class LambdaTask<In<Inputs...>, Out<Outputs...>>
-    : public SingleInputTaskCombinator<In<Inputs...>, Out<Outputs...>> {
+template <size_t Separator, typename... Types>
+class LambdaTask
+    : public SingleInputTaskCombinator<hh::tool::Inputs<Separator, Types...>,
+                                       hh::tool::Outputs<Separator, Types...>> {
 private:
-  using CoreTaskType =
-      hh::core::CoreTask<sizeof...(Inputs), Inputs..., Outputs...>;
-  using AbstractTaskType =
-      hh::AbstractTask<sizeof...(Inputs), Inputs..., Outputs...>;
+  using CoreTaskType = hh::core::CoreTask<Separator, Types...>;
+  using AbstractTaskType = hh::AbstractTask<Separator, Types...>;
 
 public:
   template <typename Executable>
   LambdaTask(const std::string name, Executable executable,
              int32_t numberThreads = 1, bool automaticStart = false)
-      : SingleInputTaskCombinator<In<Inputs...>, Out<Outputs...>>(
+      : SingleInputTaskCombinator<hh::tool::Inputs<Separator, Types...>,
+                                  hh::tool::Outputs<Separator, Types...>>(
             executable, std::make_shared<CoreTaskType>(
                             dynamic_cast<AbstractTaskType *>(this), name,
                             numberThreads, automaticStart)) {}
@@ -96,7 +94,7 @@ public:
 /******************************************************************************/
 
 int main() {
-  auto Simple = std::make_shared<LambdaTask<In<int, double>, Out<int>>>(
+  auto Simple = std::make_shared<LambdaTask<2, int, double, int>>(
       "Simple", []<typename T>(std::shared_ptr<T> data, auto *pThis) {
         if constexpr (std::is_same_v<T, int>) {
           (*data)++;
@@ -110,10 +108,5 @@ int main() {
           pThis->addResult(std::make_shared<int>(*data));
         }
       });
-
-  auto test =
-      std::dynamic_pointer_cast<hh::AbstractTask<2, int, double, int>>(Simple);
-
-  std::cout << test << std::endl;
   return 0;
 }
