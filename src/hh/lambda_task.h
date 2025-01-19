@@ -8,40 +8,9 @@
 
 #include <hedgehog/hedgehog.h>
 #include "lambda_core_task.h"
+#include "lambda_tools.h"
 
 namespace hh {
-
-namespace tool {
-
-template <typename LambdaType, typename LambdaTaskType, typename Input>
-class SingleInputTask
-    : public BehaviorMultiExecuteTypeDeducer_t<std::tuple<Input>>
-{
-  private:
-    LambdaType lambda_;
-    LambdaTaskType *task_;
-
-  public:
-    SingleInputTask(LambdaType lambda, LambdaTaskType *task)
-        : lambda_(lambda), task_(task) { }
-
-    void execute(std::shared_ptr<Input> data) override {
-        lambda_(data, task_);
-    }
-};
-
-template<typename LambdaType, typename LambdaTaskType, typename Input>
-class LambdaTaskHelper;
-
-template<typename LambdaType, typename LambdaTaskType, typename ...Inputs>
-class LambdaTaskHelper<LambdaType, LambdaTaskType, std::tuple<Inputs...>>
-    : public SingleInputTask<LambdaType, LambdaTaskType, Inputs>... {
-  public:
-      LambdaTaskHelper(LambdaType lambda, LambdaTaskType *task)
-          : SingleInputTask<LambdaType, LambdaTaskType, Inputs>(lambda, task)... {}
-};
-
-}
 
 template<typename LambdaType, size_t Separator, typename ...AllTypes>
 class LambdaTask
