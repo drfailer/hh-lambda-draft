@@ -23,4 +23,4 @@ endif (NOT MSVC)
 set(source_files src/main.cpp)
 
 # executable
-add_executable(cholesky-hh ${source_files})
+add_executable(hh-lambda ${source_files})
