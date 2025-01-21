@@ -44,6 +44,19 @@ class LambdaTaskHelper<LambdaTaskType, std::tuple<Inputs...>>
                   std::get<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)>(lambdas), task)... {}
 };
 
+
+template <typename LambdaTaskType, typename ...Inputs>
+using LambdaContainer = std::tuple<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)...>;
+
+template<class LambdaTaskType, class Inputs>
+struct LambdaContainerDeducer;
+
+template<class LambdaTaskType, class ...Inputs>
+struct LambdaContainerDeducer<LambdaTaskType, std::tuple<Inputs...>> { using type = LambdaContainer<LambdaTaskType, Inputs...>; };
+
+template<class LambdaTaskType, class TupleInputs>
+using LambdaContainerDeducer_t = typename LambdaContainerDeducer<LambdaTaskType, TupleInputs>::type;
+
 }
 
 }

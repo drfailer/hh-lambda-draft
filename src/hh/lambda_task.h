@@ -12,22 +12,6 @@
 
 namespace hh {
 
-
-// TODO: move this elsewhere
-namespace tool {
-    template <typename LambdaTaskType, typename ...Inputs>
-    using LambdaContainer = std::tuple<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)...>;
-
-    template<class LambdaTaskType, class Inputs>
-    struct LambdaContainerDeducer;
-
-    template<class LambdaTaskType, class ...Inputs>
-    struct LambdaContainerDeducer<LambdaTaskType, std::tuple<Inputs...>> { using type = LambdaContainer<LambdaTaskType, Inputs...>; };
-
-    template<class LambdaTaskType, class TupleInputs>
-    using LambdaContainerDeducer_t = typename LambdaContainerDeducer<LambdaTaskType, TupleInputs>::type;
-}
-
 template<size_t Separator, typename ...AllTypes>
 class LambdaTask
     : public behavior::TaskNode,
