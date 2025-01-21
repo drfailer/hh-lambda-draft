@@ -11,11 +11,12 @@ namespace hh {
 
 namespace tool {
 
-template <typename LambdaType, typename LambdaTaskType, typename Input>
+template <typename LambdaTaskType, typename Input>
 class SingleInputTask
     : public BehaviorMultiExecuteTypeDeducer_t<std::tuple<Input>>
 {
   private:
+    using LambdaType = void(*)(std::shared_ptr<Input>, LambdaTaskType*);
     LambdaType lambda_;
     LambdaTaskType *task_;
 
@@ -28,15 +29,19 @@ class SingleInputTask
     }
 };
 
-template<typename LambdaType, typename LambdaTaskType, typename Input>
+template<typename LambdaTaskType, typename Input>
 class LambdaTaskHelper;
 
-template<typename LambdaType, typename LambdaTaskType, typename ...Inputs>
-class LambdaTaskHelper<LambdaType, LambdaTaskType, std::tuple<Inputs...>>
-    : public SingleInputTask<LambdaType, LambdaTaskType, Inputs>... {
+template<typename LambdaTaskType, typename ...Inputs>
+class LambdaTaskHelper<LambdaTaskType, std::tuple<Inputs...>>
+    : public SingleInputTask<LambdaTaskType, Inputs>... {
   public:
-      LambdaTaskHelper(LambdaType lambda, LambdaTaskType *task)
-          : SingleInputTask<LambdaType, LambdaTaskType, Inputs>(lambda, task)... {}
+      using LambdaContainer = std::tuple<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)...>;
+
+  public:
+      LambdaTaskHelper(LambdaContainer lambdas, LambdaTaskType *task)
+          : SingleInputTask<LambdaTaskType, Inputs>(
+                  std::get<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)>(lambdas), task)... {}
 };
 
 }
