@@ -27,6 +27,11 @@ class SingleInputTask
     void execute(std::shared_ptr<Input> data) override {
         lambda_(data, task_);
     }
+
+    void reinitialize(LambdaType lambda, LambdaTaskType *task) {
+        lambda_ = lambda;
+        task_   = task;
+    }
 };
 
 template<typename LambdaTaskType, typename Input>
@@ -42,6 +47,10 @@ class LambdaTaskHelper<LambdaTaskType, std::tuple<Inputs...>>
       LambdaTaskHelper(LambdaContainer lambdas, LambdaTaskType *task)
           : SingleInputTask<LambdaTaskType, Inputs>(
                   std::get<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)>(lambdas), task)... {}
+
+      void reinitialize(LambdaContainer lambdas, LambdaTaskType *task) {
+          (SingleInputTask<LambdaTaskType, Inputs>::reinitialize(std::get<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)>(lambdas), task), ...);
+      }
 };
 
 

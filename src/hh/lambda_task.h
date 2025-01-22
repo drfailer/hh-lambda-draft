@@ -24,7 +24,8 @@ class LambdaTask
  private:
   std::shared_ptr<hh::core::LambdaCoreTask<Separator, AllTypes...>> const coreTask_ = nullptr; ///< Task core
   using Lambdas = tool::LambdaContainerDeducer_t<LambdaTask<Separator, AllTypes...>, tool::Inputs<Separator, AllTypes...>>;
-  Lambdas lambdas_;
+  Lambdas lambdas_ = {};
+  using LambdaTaskType = LambdaTask<Separator, AllTypes...>;
 
  public:
   using tool::BehaviorTaskMultiSendersTypeDeducer_t<tool::Outputs<Separator, AllTypes...>>::addResult;
@@ -41,7 +42,25 @@ class LambdaTask
                                tool::Inputs<Separator, AllTypes...>>(lambdas, this),
         tool::BehaviorTaskMultiSendersTypeDeducer_t<tool::Outputs<Separator, AllTypes...>>(
             (std::dynamic_pointer_cast<hh::core::LambdaCoreTask<Separator, AllTypes...>>(this->core()))),
-        coreTask_(std::dynamic_pointer_cast<core::LambdaCoreTask<Separator, AllTypes...>>(this->core()))
+        coreTask_(std::dynamic_pointer_cast<core::LambdaCoreTask<Separator, AllTypes...>>(this->core())),
+        lambdas_(lambdas)
+  {
+    if (numberThreads == 0) { throw std::runtime_error("A task needs at least one thread."); }
+    if (coreTask_ == nullptr) { throw std::runtime_error("The core used by the task should be a CoreTask."); }
+  }
+
+  explicit LambdaTask(std::string const &name, size_t const numberThreads = 1, bool const automaticStart = false)
+      : behavior::TaskNode(std::make_shared<core::LambdaCoreTask<Separator, AllTypes...>>(this,
+                                                                                    name,
+                                                                                    numberThreads,
+                                                                                    automaticStart)),
+        behavior::Copyable<LambdaTask<Separator, AllTypes...>>(numberThreads),
+        tool::LambdaTaskHelper<LambdaTask<Separator, AllTypes...>,
+                               tool::Inputs<Separator, AllTypes...>>(lambdas_, this),
+        tool::BehaviorTaskMultiSendersTypeDeducer_t<tool::Outputs<Separator, AllTypes...>>(
+            (std::dynamic_pointer_cast<hh::core::LambdaCoreTask<Separator, AllTypes...>>(this->core()))),
+        coreTask_(std::dynamic_pointer_cast<core::LambdaCoreTask<Separator, AllTypes...>>(this->core())),
+        lambdas_({})
   {
     if (numberThreads == 0) { throw std::runtime_error("A task needs at least one thread."); }
     if (coreTask_ == nullptr) { throw std::runtime_error("The core used by the task should be a CoreTask."); }
@@ -59,6 +78,12 @@ class LambdaTask
   { }
 
   ~LambdaTask() override = default;
+
+    template<hh::tool::ContainsInTupleConcept<tool::Inputs<Separator, AllTypes...>> Input>
+    void setLambda(void(lambda)(std::shared_ptr<Input>, LambdaTaskType*)) {
+        std::get<void(*)(std::shared_ptr<Input>, LambdaTaskType*)>(lambdas_) = lambda;
+        tool::LambdaTaskHelper<LambdaTaskType, tool::Inputs<Separator, AllTypes...>>::reinitialize(lambdas_, this);
+    }
 
   [[nodiscard]] size_t graphId() const { return coreTask_->graphId(); }
 
