@@ -9,6 +9,7 @@
 #include <hedgehog/hedgehog.h>
 #include "lambda_core_task.h"
 #include "lambda_tools.h"
+#include "task_interface.h"
 
 namespace hh {
 
@@ -27,7 +28,7 @@ class InternalLambdaTask
           tool::Inputs<Separator, AllTypes...>>,
       public tool::BehaviorTaskMultiSendersTypeDeducer_t<
           tool::Outputs<Separator, AllTypes...>> {
-private:
+ private:
   std::shared_ptr<hh::core::LambdaCoreTask<SubType, Separator, AllTypes...>> const coreTask_ = nullptr; ///< Task core
 
   using LambdaTaskType = std::conditional_t<std::is_same_v<SubType, void>, InternalLambdaTask<SubType, Separator, AllTypes...>, SubType>;
@@ -36,8 +37,7 @@ private:
   LambdaTaskType *self_ = nullptr;
 
  public:
-  using tool::BehaviorTaskMultiSendersTypeDeducer_t<tool::Outputs<Separator, AllTypes...>>::addResult;
-  using behavior::TaskNode::getManagedMemory;
+  friend tool::TaskInterface<LambdaTaskType>;
 
  public:
   explicit InternalLambdaTask(std::string const &name, Lambdas lambdas, size_t const numberThreads = 1, bool const automaticStart = false, LambdaTaskType *self = nullptr)
@@ -72,13 +72,14 @@ private:
         coreTask_(std::dynamic_pointer_cast<core::LambdaCoreTask<SubType, Separator, AllTypes...>>(this->core())),
         lambdas_({}),
         self_(self)
-  { }
+  {
+  }
 
   ~InternalLambdaTask() override = default;
 
   template<hh::tool::ContainsInTupleConcept<tool::Inputs<Separator, AllTypes...>> Input>
-  void setLambda(void(lambda)(std::shared_ptr<Input>, LambdaTaskType*)) {
-      std::get<void(*)(std::shared_ptr<Input>, LambdaTaskType*)>(lambdas_) = lambda;
+  void setLambda(void(lambda)(std::shared_ptr<Input>, tool::TaskInterface<LambdaTaskType>)) {
+      std::get<void(*)(std::shared_ptr<Input>, tool::TaskInterface<LambdaTaskType>)>(lambdas_) = lambda;
       tool::LambdaTaskHelper<LambdaTaskType, tool::Inputs<Separator, AllTypes...>>::reinitialize(lambdas_, self_);
   }
 
@@ -99,7 +100,6 @@ private:
  protected:
   std::shared_ptr<hh::core::LambdaCoreTask<SubType, Separator, AllTypes...>> const &coreTask() const { return coreTask_; }
 
- public:
   [[nodiscard]] int deviceId() const { return coreTask_->deviceId(); }
 };
 }

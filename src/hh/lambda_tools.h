@@ -1,6 +1,7 @@
 #ifndef HEDGEHOG_LAMBDA_TOOLS_H
 #define HEDGEHOG_LAMBDA_TOOLS_H
 
+#include "task_interface.h"
 #include <hedgehog/hedgehog.h>
 
 namespace hh {
@@ -16,9 +17,9 @@ class SingleInputTask
     : public BehaviorMultiExecuteTypeDeducer_t<std::tuple<Input>>
 {
   private:
-    using LambdaType = void(*)(std::shared_ptr<Input>, LambdaTaskType*);
+    using LambdaType = void(*)(std::shared_ptr<Input>, TaskInterface<LambdaTaskType>);
     LambdaType lambda_;
-    LambdaTaskType *task_;
+    TaskInterface<LambdaTaskType> task_;
 
   public:
     SingleInputTask(LambdaType lambda, LambdaTaskType *task)
@@ -30,7 +31,7 @@ class SingleInputTask
 
     void reinitialize(LambdaType lambda, LambdaTaskType *task) {
         lambda_ = lambda;
-        task_   = task;
+        task_.task(task);
     }
 };
 
@@ -41,21 +42,21 @@ template<typename LambdaTaskType, typename ...Inputs>
 class LambdaTaskHelper<LambdaTaskType, std::tuple<Inputs...>>
     : public SingleInputTask<LambdaTaskType, Inputs>... {
   public:
-      using LambdaContainer = std::tuple<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)...>;
+      using LambdaContainer = std::tuple<void(*)(std::shared_ptr<Inputs>, TaskInterface<LambdaTaskType>)...>;
 
   public:
       LambdaTaskHelper(LambdaContainer lambdas, LambdaTaskType *task)
           : SingleInputTask<LambdaTaskType, Inputs>(
-                  std::get<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)>(lambdas), task)... {}
+                  std::get<void(*)(std::shared_ptr<Inputs>, TaskInterface<LambdaTaskType>)>(lambdas), task)... {}
 
       void reinitialize(LambdaContainer lambdas, LambdaTaskType *task) {
-          (SingleInputTask<LambdaTaskType, Inputs>::reinitialize(std::get<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)>(lambdas), task), ...);
+          (SingleInputTask<LambdaTaskType, Inputs>::reinitialize(std::get<void(*)(std::shared_ptr<Inputs>, TaskInterface<LambdaTaskType>)>(lambdas), task), ...);
       }
 };
 
 
 template <typename LambdaTaskType, typename ...Inputs>
-using LambdaContainer = std::tuple<void(*)(std::shared_ptr<Inputs>, LambdaTaskType*)...>;
+using LambdaContainer = std::tuple<void(*)(std::shared_ptr<Inputs>, TaskInterface<LambdaTaskType>)...>;
 
 template<class LambdaTaskType, class Inputs>
 struct LambdaContainerDeducer;

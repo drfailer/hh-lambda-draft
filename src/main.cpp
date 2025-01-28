@@ -46,18 +46,18 @@ int main() {
 //                });
 
     auto Simple = std::make_shared<MySpecializedLambdaTask<2, int, double, int>>("Special");
-    Simple->setLambda<int>([](std::shared_ptr<int> data, MySpecializedLambdaTask<2, int, double, int> *pThis) {
+    Simple->setLambda<int>([](std::shared_ptr<int> data, auto pThis) {
         (*data)++;
         /* pThis->getManagedMemory(); */
-        pThis->addResult(data);
-        printf("[Simple<int>][Data %d][Device ID %d][MyHandle %d]\n", *data, pThis->deviceId(), pThis->getMyHandle());
+        pThis.addResult(data);
+        printf("[Simple<int>][Data %d][Device ID %d][MyHandle %d]\n", *data, pThis.deviceId(), pThis->getMyHandle());
     });
 
-    Simple->setLambda<double>([](std::shared_ptr<double> data, MySpecializedLambdaTask<2, int, double, int> *pThis) {
+    Simple->setLambda<double>([](std::shared_ptr<double> data, auto pThis) {
         (*data)++;
         /* pThis->getManagedMemory(); */
-        pThis->addResult(std::make_shared<int>(*data));
-        printf("[Simple<double>][Data %f][Device ID %d][MyHandle %d]\n", *data, pThis->deviceId(), pThis->getMyHandle());
+        pThis.addResult(std::make_shared<int>(*data));
+        printf("[Simple<double>][Data %f][Device ID %d][MyHandle %d]\n", *data, pThis.deviceId(), pThis->getMyHandle());
     });
 
   hh::Graph<2, int, double, int> graph("test");
