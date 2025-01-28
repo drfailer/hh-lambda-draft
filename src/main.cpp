@@ -5,10 +5,11 @@ struct CPUTask: public hh::AbstractTask<1, int, float>{};
 
 // Usecase: CUDA Task, cublas Task...
 template<size_t Separator, typename ...AllTypes>
-class MySpecializedLambdaTask: public hh::LambdaTask<Separator, AllTypes...> {
+class MySpecializedLambdaTask
+    : public hh::LambdaTask<MySpecializedLambdaTask<Separator, AllTypes...>, Separator, AllTypes...> {
 public:
     explicit MySpecializedLambdaTask(const std::string name, size_t numberThreads = 1, bool automaticStart = false):
-        hh::LambdaTask<Separator, AllTypes...>(name, numberThreads, automaticStart) {}
+        hh::LambdaTask<MySpecializedLambdaTask<Separator, AllTypes...>, Separator, AllTypes...>(name, this, numberThreads, automaticStart) {}
 
     void initialize() override {
         myHandle_ = 42;
@@ -45,24 +46,18 @@ int main() {
 //                });
 
     auto Simple = std::make_shared<MySpecializedLambdaTask<2, int, double, int>>("Special");
-    Simple->setLambda<int>([](std::shared_ptr<int> data, auto *pThis) {
+    Simple->setLambda<int>([](std::shared_ptr<int> data, MySpecializedLambdaTask<2, int, double, int> *pThis) {
         (*data)++;
         /* pThis->getManagedMemory(); */
         pThis->addResult(data);
-
-        auto self = dynamic_cast<MySpecializedLambdaTask<2, int, double, int>*>(pThis);
-        if(self == nullptr) return;
-        printf("[Simple<int>][Data %d][Device ID %d][MyHandle %d]\n", *data, pThis->deviceId(), self->getMyHandle());
+        printf("[Simple<int>][Data %d][Device ID %d][MyHandle %d]\n", *data, pThis->deviceId(), pThis->getMyHandle());
     });
 
-    Simple->setLambda<double>([](std::shared_ptr<double> data, auto *pThis) {
+    Simple->setLambda<double>([](std::shared_ptr<double> data, MySpecializedLambdaTask<2, int, double, int> *pThis) {
         (*data)++;
         /* pThis->getManagedMemory(); */
         pThis->addResult(std::make_shared<int>(*data));
-
-        auto self = dynamic_cast<MySpecializedLambdaTask<2, int, double, int>*>(pThis);
-        if(self == nullptr) return;
-        printf("[Simple<double>][Data %f][Device ID %d][MyHandle %d]\n", *data, pThis->deviceId(), self->getMyHandle());
+        printf("[Simple<double>][Data %f][Device ID %d][MyHandle %d]\n", *data, pThis->deviceId(), pThis->getMyHandle());
     });
 
   hh::Graph<2, int, double, int> graph("test");

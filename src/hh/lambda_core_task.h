@@ -8,8 +8,8 @@
 
 namespace hh {
 
-template<size_t Separator, typename ...AllTypes>
-class LambdaTask;
+template <typename SubType, size_t Separator, typename... AllTypes>
+class InternalLambdaTask;
 
 namespace core {
 
@@ -21,27 +21,27 @@ using TIM = tool::TaskInputsManagementAbstractionTypeDeducer_t<tool::Inputs<Sepa
 template<size_t Separator, class ...AllTypes>
 using TOM = tool::TaskOutputsManagementAbstractionTypeDeducer_t<tool::Outputs<Separator, AllTypes...>>;
 
-template<size_t Separator, class ...AllTypes>
+template<typename SubType, size_t Separator, class ...AllTypes>
 class LambdaCoreTask
     : public abstraction::TaskNodeAbstraction,
       public abstraction::ClonableAbstraction,
       public abstraction::CleanableAbstraction,
-      public abstraction::GroupableAbstraction<LambdaTask<Separator, AllTypes...>, LambdaCoreTask<Separator, AllTypes...>>,
+      public abstraction::GroupableAbstraction<InternalLambdaTask<SubType, Separator, AllTypes...>, LambdaCoreTask<SubType, Separator, AllTypes...>>,
       public TIM<Separator, AllTypes...>,
       public TOM<Separator, AllTypes...> {
 
  private:
-  LambdaTask<Separator, AllTypes...> *const
+  InternalLambdaTask<SubType, Separator, AllTypes...> *const
       task_ = nullptr; ///< User defined task
 
   bool const
       automaticStart_ = false; ///< Flag for automatic start
 
  public:
-  explicit LambdaCoreTask(LambdaTask<Separator, AllTypes...> *const task) :
+  explicit LambdaCoreTask(InternalLambdaTask<SubType, Separator, AllTypes...> *const task) :
       TaskNodeAbstraction("Task", task),
       CleanableAbstraction(static_cast<behavior::Cleanable *>(task)),
-      abstraction::GroupableAbstraction<LambdaTask<Separator, AllTypes...>, LambdaCoreTask<Separator, AllTypes...>>(
+      abstraction::GroupableAbstraction<InternalLambdaTask<SubType, Separator, AllTypes...>, LambdaCoreTask<SubType, Separator, AllTypes...>>(
           task, 1
       ),
       TIM<Separator, AllTypes...>(task, this),
@@ -49,11 +49,11 @@ class LambdaCoreTask
       task_(task),
       automaticStart_(false) {}
 
-  LambdaCoreTask(LambdaTask<Separator, AllTypes...> *const task,
+  LambdaCoreTask(InternalLambdaTask<SubType, Separator, AllTypes...> *const task,
            std::string const &name, size_t const numberThreads, bool const automaticStart) :
       TaskNodeAbstraction(name, task),
       CleanableAbstraction(static_cast<behavior::Cleanable *>(task)),
-      abstraction::GroupableAbstraction<LambdaTask<Separator, AllTypes...>, LambdaCoreTask<Separator, AllTypes...>>(
+      abstraction::GroupableAbstraction<InternalLambdaTask<SubType, Separator, AllTypes...>, LambdaCoreTask<SubType, Separator, AllTypes...>>(
           task, numberThreads
       ),
       TIM<Separator, AllTypes...>(task, this),
@@ -64,7 +64,7 @@ class LambdaCoreTask
   }
 
   template<class ConcreteMultiReceivers, class ConcreteMultiExecutes, class ConcreteMultiSenders>
-  LambdaCoreTask(LambdaTask<Separator, AllTypes...> *const task,
+  LambdaCoreTask(InternalLambdaTask<SubType, Separator, AllTypes...> *const task,
            std::string const &name, size_t const numberThreads, bool const automaticStart,
            std::shared_ptr<implementor::ImplementorSlot> concreteSlot,
            std::shared_ptr<ConcreteMultiReceivers> concreteMultiReceivers,
@@ -73,7 +73,7 @@ class LambdaCoreTask
            std::shared_ptr<ConcreteMultiSenders> concreteMultiSenders) :
       TaskNodeAbstraction(name, task),
       CleanableAbstraction(static_cast<behavior::Cleanable *>(task)),
-      abstraction::GroupableAbstraction<LambdaTask<Separator, AllTypes...>, LambdaCoreTask<Separator, AllTypes...>>
+      abstraction::GroupableAbstraction<InternalLambdaTask<SubType, Separator, AllTypes...>, LambdaCoreTask<SubType, Separator, AllTypes...>>
           (task, numberThreads),
       TIM<Separator, AllTypes...>(task, this, concreteSlot, concreteMultiReceivers, concreteMultiExecutes),
       TOM<Separator, AllTypes...>(concreteNotifier, concreteMultiSenders),
@@ -183,7 +183,7 @@ class LambdaCoreTask
       // Copy the memory manager
       taskCopy->connectMemoryManager(this->task_->memoryManager());
 
-      auto taskCoreCopy = dynamic_cast<LambdaCoreTask<Separator, AllTypes...> *>(taskCopy->core().get());
+      auto taskCoreCopy = dynamic_cast<LambdaCoreTask<SubType, Separator, AllTypes...> *>(taskCopy->core().get());
 
       if (taskCoreCopy == nullptr) {
         std::ostringstream oss;
@@ -238,7 +238,7 @@ class LambdaCoreTask
 
   /// @brief Copy task's inner structure
   /// @param copyableCore Task to copy from
-  void copyInnerStructure(LambdaCoreTask<Separator, AllTypes...> *copyableCore) override {
+  void copyInnerStructure(LambdaCoreTask<SubType, Separator, AllTypes...> *copyableCore) override {
     TIM<Separator, AllTypes...>::copyInnerStructure(copyableCore);
     TOM<Separator, AllTypes...>::copyInnerStructure(copyableCore);
   }
@@ -262,7 +262,7 @@ class LambdaCoreTask
   /// @return Clone of this task
   std::shared_ptr<abstraction::NodeAbstraction> clone(
       [[maybe_unused]] std::map<NodeAbstraction *, std::shared_ptr<NodeAbstraction>> &correspondenceMap) override {
-    auto clone = std::dynamic_pointer_cast<LambdaTask<Separator, AllTypes...>>(this->callCopy());
+    auto clone = std::dynamic_pointer_cast<InternalLambdaTask<SubType, Separator, AllTypes...>>(this->callCopy());
     if (this->hasMemoryManagerAttached()) { clone->connectMemoryManager(this->memoryManager()->copy()); }
     return clone->core();
   }
